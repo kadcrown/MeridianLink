@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: meridianlink_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://meridian:meridian_secure_pass_123@postgres:5432/meridianlink?schema=public
+      - OWNER_EMAIL=owner@meridianlink.local
+      - OWNER_INITIAL_PASSWORD=ChangeMeInProd123!
+      - APP_SECRET=meridianlink_production_secure_master_key_random_seed_9876543210
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - TRUSTED_PROXY_HEADERS=CF-IPCountry,X-Geo-Country,X-Vercel-IP-Country,Fly-Client-IP-Country
+      - DATA_RETENTION_DAYS=90
+      - NODE_ENV=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: meridianlink_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: meridian
+      POSTGRES_PASSWORD: meridian_secure_pass_123
+      POSTGRES_DB: meridianlink
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meridian -d meridianlink"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+    driver: local

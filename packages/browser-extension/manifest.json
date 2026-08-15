@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "MeridianLink Creator Extension",
+  "version": "1.0.0",
+  "description": "Instantly convert Amazon, Best Buy, and Walmart product pages into localized SmartLinks.",
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "storage",
+    "clipboardWrite"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "MeridianLink Smart Generator"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

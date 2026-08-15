@@ -1,0 +1,627 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Owner {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  passwordHash     String
+  name             String    @default("Owner")
+  totpSecret       String?
+  totpEnabled      Boolean   @default(false)
+  lastLoginAt      DateTime?
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  apiTokens        ApiToken[]
+  auditEvents      AuditEvent[]
+}
+
+model SmartLink {
+  id                 String    @id @default(cuid())
+  slug               String    @unique
+  displayName        String
+  originalUrl        String
+  linkType           String    @default("SMART") // SMART, CHOICE, AB_TEST
+  asin               String?
+  productTitle       String?
+  productImageUrl    String?
+  brand              String?
+  retailerId         String?
+  notes              String?
+  defaultMarketplace String    @default("US")
+  isArchived         Boolean   @default(false)
+  isActive           Boolean   @default(true)
+  groupId            String?
+  group              LinkGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  // Tracking & UTM parameters
+  utmSource          String?
+  utmMedium          String?
+  utmCampaign        String?
+  utmTerm            String?
+  utmContent         String?
+  preserveIncomingUtm Boolean  @default(true)
+  attributionPolicy  String    @default("PRESERVE") // PRESERVE, REPLACE, STORE_UNCHANGED, REJECT
+
+  // Destinations & Rules
+  destinations       Destination[]
+  rules              LinkRule[]
+  abVariants         ABVariant[]
+  tagOverrides       AmazonAffiliateTag[]
+  linkOverrides      LinkAffiliateOverride[]
+
+  // Choice page customization
+  choiceTheme        ChoicePageTheme?
+
+  // Analytics & Health
+  clickEvents        ClickEvent[]
+  dailyRollups       DailyAnalyticsRollup[]
+  healthChecks       HealthCheck[]
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([slug])
+  @@index([groupId])
+  @@index([asin])
+  @@index([isArchived])
+}
+
+model Destination {
+  id               String    @id @default(cuid())
+  smartLinkId      String
+  smartLink        SmartLink @relation(fields: [smartLinkId], references: [id], onDelete: Cascade)
+
+  retailerId       String?
+  retailer         Retailer? @relation(fields: [retailerId], references: [id], onDelete: SetNull)
+  programId        String?
+  program          AffiliateProgram? @relation(fields: [programId], references: [id], onDelete: SetNull)
+
+  countryCode      String    @default("GLOBAL") // 2-letter ISO or "GLOBAL"
+  marketplace      String    @default("US")     // Amazon store or retailer locale
+  url              String
+  affiliateUrl     String?
+  label            String?
+  priceString      String?
+  currency         String?
+  isOutOfStock     Boolean   @default(false)
+  dataTimestamp    DateTime?
+  isManual         Boolean   @default(true)
+  isVerified       Boolean   @default(false)
+  fallbackType     String    @default("ASIN_TRANSFER") // MANUAL, EXACT_ASIN, VARIATION, PARENT_MATCH, SEARCH_CANDIDATE, SEARCH_FALLBACK, UNVERIFIED, UNAVAILABLE
+  weight           Int       @default(100)
+  priority         Int       @default(0)
+  isActive         Boolean   @default(true)
+  lastHealthStatus Int?
+  lastCheckedAt    DateTime?
+
+  healthChecks     HealthCheck[]
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([smartLinkId])
+  @@index([countryCode])
+  @@index([marketplace])
+}
+
+model LinkRule {
+  id               String    @id @default(cuid())
+  smartLinkId      String
+  smartLink        SmartLink @relation(fields: [smartLinkId], references: [id], onDelete: Cascade)
+
+  name             String
+  priority         Int       @default(0)
+  matchMode        String    @default("ALL") // ALL, ANY
+  actionType       String    @default("REDIRECT_URL") // REDIRECT_URL, SELECT_RETAILER, SHOW_CHOICE_PAGE, APPLY_UTM
+  targetUrl        String?
+  targetRetailerId String?
+  conditionsJson   String    // JSON string of conditions
+  explanation      String?
+  isActive         Boolean   @default(true)
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([smartLinkId])
+}
+
+model LinkGroup {
+  id           String    @id @default(cuid())
+  name         String
+  slug         String    @unique
+  description  String?
+  color        String    @default("#0d9488")
+  isDefault    Boolean   @default(false)
+  isArchived   Boolean   @default(false)
+
+  links        SmartLink[]
+  tagOverrides AmazonAffiliateTag[]
+  overrides    GroupAffiliateOverride[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([slug])
+}
+
+model Retailer {
+  id             String    @id @default(cuid())
+  slug           String    @unique
+  name           String
+  websiteUrl     String
+  logoUrl        String?
+  defaultNetwork String?
+  isAmazon       Boolean   @default(false)
+  isActive       Boolean   @default(true)
+
+  domains        RetailerDomain[]
+  programs       AffiliateProgram[]
+  destinations   Destination[]
+  countryPrefs   RetailerCountryPreference[]
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([slug])
+}
+
+model RetailerDomain {
+  id         String   @id @default(cuid())
+  retailerId String
+  retailer   Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  domain     String
+  isPrimary  Boolean  @default(false)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([retailerId, domain])
+  @@index([domain])
+}
+
+model AffiliateNetwork {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  websiteUrl  String?
+  adapterKey  String   @default("MANUAL")
+  isActive    Boolean  @default(true)
+
+  programs    AffiliateProgram[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([slug])
+}
+
+model AffiliateProgram {
+  id               String   @id @default(cuid())
+  retailerId       String
+  retailer         Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  networkId        String
+  network          AffiliateNetwork @relation(fields: [networkId], references: [id], onDelete: Cascade)
+
+  name             String
+  slug             String   @unique
+  countryCode      String   @default("GLOBAL")
+  marketplace      String?
+  capabilityLevel  String   @default("TRACKING_URL_TEMPLATE") // IDENTIFIER_ONLY, TRACKING_URL_TEMPLATE, DEEPLINK_API, PRODUCT_CATALOG_API, FULL_COMMERCE_API, MANUAL_ONLY
+  connectionType   String   @default("URL_TEMPLATE")
+  urlTemplate      String?
+  documentationUrl String?
+  isDiscontinued   Boolean  @default(false)
+  statusNote       String?
+  verificationDate DateTime?
+  isActive         Boolean  @default(true)
+
+  fieldDefinitions AffiliateProgramFieldDefinition[]
+  connections      AffiliateConnection[]
+  destinations     Destination[]
+  policies         ProgramPolicy[]
+  healthChecks     ProgramHealthCheck[]
+  linkOverrides    LinkAffiliateOverride[]
+  groupOverrides   GroupAffiliateOverride[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([slug])
+  @@index([retailerId])
+  @@index([networkId])
+  @@index([countryCode])
+}
+
+model AffiliateProgramFieldDefinition {
+  id          String   @id @default(cuid())
+  programId   String
+  program     AffiliateProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  key         String
+  label       String
+  placeholder String?
+  fieldType   String   @default("TEXT") // TEXT, SECRET, SELECT, URL
+  isRequired  Boolean  @default(true)
+  isSecret    Boolean  @default(false)
+  helpText    String?
+  order       Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([programId, key])
+}
+
+model AffiliateConnection {
+  id              String   @id @default(cuid())
+  programId       String
+  program         AffiliateProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  name            String   @default("Primary Connection")
+  isAccountDefault Boolean @default(true)
+  isActive        Boolean  @default(true)
+  isManualMode    Boolean  @default(false)
+  connectionStatus String  @default("CONFIGURED") // CONFIGURED, VERIFIED, AUTH_FAILED, RATE_LIMITED, UNAVAILABLE
+  lastTestedAt    DateTime?
+  lastError       String?
+
+  configValuesJson String  @default("{}") // Public/masked values as JSON
+  secrets         AffiliateConnectionSecret[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([programId])
+}
+
+model AffiliateConnectionSecret {
+  id           String   @id @default(cuid())
+  connectionId String
+  connection   AffiliateConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  key          String
+  encryptedVal String   // Encrypted ciphertext
+  iv           String   // AES-GCM IV
+  authTag      String   // AES-GCM Auth tag
+  maskedSuffix String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([connectionId, key])
+}
+
+model RetailerCountryPreference {
+  id         String   @id @default(cuid())
+  countryCode String
+  retailerId String
+  retailer   Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+  priority   Int      @default(0)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([countryCode, retailerId])
+  @@index([countryCode])
+}
+
+model LinkAffiliateOverride {
+  id          String   @id @default(cuid())
+  smartLinkId String
+  smartLink   SmartLink @relation(fields: [smartLinkId], references: [id], onDelete: Cascade)
+  programId   String
+  program     AffiliateProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  customTag   String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([smartLinkId, programId])
+}
+
+model GroupAffiliateOverride {
+  id        String   @id @default(cuid())
+  groupId   String
+  group     LinkGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  programId String
+  program   AffiliateProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  customTag String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([groupId, programId])
+}
+
+model ProgramPolicy {
+  id                 String   @id @default(cuid())
+  programId          String
+  program            AffiliateProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  disclosureRequired Boolean  @default(true)
+  disclosureText     String?
+  trademarkRules     String?
+  priceDisplayRules  String?
+  cachingRules       String?
+  lastReviewedAt     DateTime @default(now())
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([programId])
+}
+
+model ProgramHealthCheck {
+  id            String   @id @default(cuid())
+  programId     String
+  program       AffiliateProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  status        String   // VERIFIED, FAILED, TIMEOUT, RATE_LIMITED
+  statusCode    Int?
+  latencyMs     Int?
+  failureReason String?
+  timestamp     DateTime @default(now())
+
+  @@index([programId])
+}
+
+model AmazonAffiliateTag {
+  id          String    @id @default(cuid())
+  marketplace String    // e.g. "US", "CA", "GB", "DE"
+  tag         String
+  isDefault   Boolean   @default(false)
+  groupId     String?
+  group       LinkGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  smartLinkId String?
+  smartLink   SmartLink? @relation(fields: [smartLinkId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([marketplace])
+  @@index([groupId])
+  @@index([smartLinkId])
+}
+
+model ABVariant {
+  id             String    @id @default(cuid())
+  smartLinkId    String
+  smartLink      SmartLink @relation(fields: [smartLinkId], references: [id], onDelete: Cascade)
+  name           String
+  destinationUrl String
+  marketplace    String    @default("US")
+  weight         Int       @default(50)
+  isActive       Boolean   @default(true)
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([smartLinkId])
+}
+
+model ChoicePageTheme {
+  id              String    @id @default(cuid())
+  smartLinkId     String    @unique
+  smartLink       SmartLink @relation(fields: [smartLinkId], references: [id], onDelete: Cascade)
+
+  title           String?
+  description     String?
+  ctaText         String    @default("Choose your preferred store")
+  accentColor     String    @default("#0d9488")
+  themeMode       String    @default("SYSTEM") // LIGHT, DARK, SYSTEM
+  buttonStyle     String    @default("ROUNDED") // PILL, ROUNDED, SQUARE
+  showDisclosures Boolean   @default(true)
+  disclosureText  String?
+  customLogoUrl   String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ClickEvent {
+  id               String    @id @default(cuid())
+  smartLinkId      String
+  smartLink        SmartLink @relation(fields: [smartLinkId], references: [id], onDelete: Cascade)
+
+  destinationId    String?
+  retailerSlug     String?
+  networkSlug      String?
+  programSlug      String?
+
+  country          String    @default("UNKNOWN")
+  region           String?
+  city             String?
+  marketplace      String    @default("US")
+
+  deviceCategory   String    @default("DESKTOP") // DESKTOP, MOBILE, TABLET, BOT
+  osFamily         String    @default("UNKNOWN")
+  browserFamily    String    @default("UNKNOWN")
+  language         String?
+  referrerDomain   String?
+  referrerHost     String?
+
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmTerm          String?
+  utmContent       String?
+
+  linkType         String    @default("SMART")
+  abVariantId      String?
+  choiceOptionId   String?
+  isBot            Boolean   @default(false)
+  botClassification String?
+  visitorHash      String?
+  redirectedUrl    String?
+
+  timestamp        DateTime  @default(now())
+
+  @@index([smartLinkId])
+  @@index([timestamp])
+  @@index([country])
+  @@index([deviceCategory])
+  @@index([isBot])
+}
+
+model DailyAnalyticsRollup {
+  id                     String    @id @default(cuid())
+  date                   String    // YYYY-MM-DD
+  smartLinkId            String
+  smartLink              SmartLink @relation(fields: [smartLinkId], references: [id], onDelete: Cascade)
+
+  country                String    @default("US")
+  marketplace            String    @default("US")
+  retailerSlug           String    @default("amazon")
+  deviceCategory         String    @default("DESKTOP")
+  osFamily               String    @default("UNKNOWN")
+  browserFamily          String    @default("UNKNOWN")
+
+  totalClicks            Int       @default(0)
+  humanClicks            Int       @default(0)
+  botClicks              Int       @default(0)
+  uniqueVisitorsEstimate Int       @default(0)
+
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@unique([date, smartLinkId, country, marketplace, retailerSlug, deviceCategory, osFamily, browserFamily], name: "rollup_unique_compound_metric")
+  @@index([date])
+  @@index([smartLinkId])
+  @@index([country])
+}
+
+model HealthCheck {
+  id            String       @id @default(cuid())
+  smartLinkId   String
+  smartLink     SmartLink    @relation(fields: [smartLinkId], references: [id], onDelete: Cascade)
+  destinationId String?
+  destination   Destination? @relation(fields: [destinationId], references: [id], onDelete: SetNull)
+
+  statusCode    Int?
+  latencyMs     Int?
+  redirectChain String?
+  finalUrl      String?
+  isSuccess     Boolean      @default(true)
+  failureReason String?
+  checkType     String       @default("SCHEDULED") // SCHEDULED, ON_DEMAND, PRE_INGEST
+
+  timestamp     DateTime     @default(now())
+
+  @@index([smartLinkId])
+  @@index([destinationId])
+  @@index([timestamp])
+}
+
+model ApiToken {
+  id           String    @id @default(cuid())
+  ownerId      String
+  owner        Owner     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name         String
+  tokenHash    String    @unique
+  tokenPrefix  String
+  scopes       String    // Comma-separated: "links:read,links:write,groups:read,reports:read,youtube:scan"
+  ipAllowlist  String?
+  lastUsedAt   DateTime?
+  expiresAt    DateTime?
+  isRevoked    Boolean   @default(false)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([tokenHash])
+}
+
+model OAuthConnection {
+  id           String    @id @default(cuid())
+  provider     String    // YOUTUBE, GOOGLE
+  accountEmail String?
+  accountId    String?
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
+  scope        String?
+  isActive     Boolean   @default(true)
+
+  jobs         IntegrationJob[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([provider, accountId])
+}
+
+model IntegrationJob {
+  id             String    @id @default(cuid())
+  connectionId   String?
+  connection     OAuthConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  jobType        String    // YOUTUBE_SCAN, YOUTUBE_UPDATE, WORDPRESS_SCAN
+  status         String    @default("PENDING") // PENDING, SCANNING, AWAITING_APPROVAL, COMPLETED, FAILED, ROLLED_BACK
+  detailsJson    String?   // Proposed diff / video items
+  backupJson     String?   // Original descriptions for rollback
+  failureReason  String?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([jobType])
+  @@index([status])
+}
+
+model TrackingProvider {
+  id          String   @id @default(cuid())
+  provider    String   // META_PIXEL, GOOGLE_ADS, TIKTOK, PINTEREST, CUSTOM_IMG
+  pixelId     String
+  name        String
+  requiresConsent Boolean @default(true)
+  isActive    Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ConsentSetting {
+  id               String   @id @default(cuid())
+  regionCode       String   @unique // EU, UK, US, GLOBAL
+  requireOptIn     Boolean  @default(true)
+  cookieBannerText String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  ownerId   String?
+  owner     Owner?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  action    String
+  resource  String
+  ipAddress String?
+  userAgent String?
+  details   String?
+  timestamp DateTime @default(now())
+
+  @@index([action])
+  @@index([timestamp])
+}
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}

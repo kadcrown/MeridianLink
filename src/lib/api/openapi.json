@@ -1,0 +1,88 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MeridianLink Owner REST API",
+    "version": "1.0.0",
+    "description": "Personal API for managing SmartLinks, multi-retailer affiliate routing, and analytics."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000/api/v1",
+      "description": "Local Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API Token (mlk_live_...)"
+      }
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/links": {
+      "post": {
+        "summary": "Create a new SmartLink",
+        "description": "Generates a localized multi-retailer smart link with optional group assignment.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["originalUrl", "displayName"],
+                "properties": {
+                  "originalUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "example": "https://www.amazon.com/dp/B09XS7JWHH"
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "example": "Sony WH-1000XM5"
+                  },
+                  "slug": {
+                    "type": "string",
+                    "example": "sony-headphones"
+                  },
+                  "linkType": {
+                    "type": "string",
+                    "enum": ["SMART", "CHOICE", "AB_TEST"],
+                    "default": "SMART"
+                  },
+                  "groupId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "SmartLink successfully created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "link": { "type": "object" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid bearer token" },
+          "403": { "description": "Insufficient scope (requires 'links:write')" }
+        }
+      }
+    }
+  }
+}
