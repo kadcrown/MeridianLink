@@ -196,8 +196,20 @@ export default function ProgramsPage() {
               Loading affiliate program catalog...
             </div>
           ) : programs.length === 0 ? (
-            <div className="col-span-full py-16 text-center text-slate-500 text-xs bg-slate-900/40 border border-slate-800 rounded-2xl p-8">
-              No affiliate programs match your filter criteria.
+            <div className="col-span-full py-16 text-center text-slate-400 text-xs bg-slate-900/40 border border-slate-800 rounded-2xl p-8 space-y-3">
+              <p>No affiliate programs match your filter criteria.</p>
+              {(search || selectedNetwork || selectedCapability) && (
+                <button
+                  onClick={() => {
+                    setSearch('');
+                    setSelectedNetwork('');
+                    setSelectedCapability('');
+                  }}
+                  className="px-3 py-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/30 rounded-lg text-xs font-semibold transition"
+                >
+                  Clear All Filters
+                </button>
+              )}
             </div>
           ) : (
             programs.map((p) => {
