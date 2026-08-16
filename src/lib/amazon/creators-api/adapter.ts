@@ -103,6 +103,23 @@ export class AmazonCreatorsApiAdapter {
   }
 
   /**
+   * Helper to normalize resources to Creators API camelCase enum format.
+   */
+  private normalizeResources(resources?: string[]): string[] {
+    if (!resources || resources.length === 0) return ['itemInfo.title'];
+    return resources.map(res => {
+      // Handles OffersV2 -> offersV2, ItemInfo.Title -> itemInfo.title, etc.
+      return res
+        .split('.')
+        .map(part => {
+          if (part.toLowerCase() === 'offersv2') return 'offersV2';
+          return part.charAt(0).toLowerCase() + part.slice(1);
+        })
+        .join('.');
+    });
+  }
+
+  /**
    * GetItems: Retrieve product details by ASIN.
    */
   public async getItems(req: GetItemsRequest): Promise<CreatorsApiResponse> {
@@ -112,14 +129,14 @@ export class AmazonCreatorsApiAdapter {
       partnerTag: req.partnerTag,
       itemIds: req.itemIds,
       itemIdType: req.itemIdType || 'ASIN',
-      resources: req.resources || [
-        'ItemInfo.Title',
-        'ItemInfo.ProductInfo',
-        'ItemInfo.Features',
-        'Images.Primary.Large',
-        'OffersV2.Listings.Price',
-        'OffersV2.Listings.Availability',
-      ],
+      resources: this.normalizeResources(req.resources || [
+        'itemInfo.title',
+        'itemInfo.productInfo',
+        'itemInfo.features',
+        'images.primary.large',
+        'offersV2.listings.price',
+        'offersV2.listings.availability',
+      ]),
     };
 
     return this.request('/catalog/v1/getItems', req.marketplace, body);
@@ -136,11 +153,11 @@ export class AmazonCreatorsApiAdapter {
       keywords: req.keywords,
       searchIndex: req.searchIndex || 'All',
       itemCount: req.itemCount || 5,
-      resources: req.resources || [
-        'ItemInfo.Title',
-        'Images.Primary.Medium',
-        'OffersV2.Listings.Price',
-      ],
+      resources: this.normalizeResources(req.resources || [
+        'itemInfo.title',
+        'images.primary.medium',
+        'offersV2.listings.price',
+      ]),
     };
 
     return this.request('/catalog/v1/searchItems', req.marketplace, body);
@@ -156,10 +173,9 @@ export class AmazonCreatorsApiAdapter {
       partnerTag: req.partnerTag,
       asin: req.asin,
       variationCount: req.variationCount || 10,
-      resources: req.resources || [
-        'ItemInfo.Title',
-        'VariationSummary.VariationDimension',
-      ],
+      resources: this.normalizeResources(req.resources || [
+        'itemInfo.title',
+      ]),
     };
 
     return this.request('/catalog/v1/getVariations', req.marketplace, body);
@@ -174,7 +190,7 @@ export class AmazonCreatorsApiAdapter {
       marketplace: domain,
       partnerTag: req.partnerTag,
       browseNodeIds: req.browseNodeIds,
-      resources: req.resources || ['BrowseNodes.Ancestor', 'BrowseNodes.Children'],
+      resources: this.normalizeResources(req.resources || ['browseNodeInfo.browseNodes.ancestor', 'browseNodeInfo.browseNodes']),
     };
 
     return this.request('/catalog/v1/getBrowseNodes', req.marketplace, body);
@@ -218,7 +234,7 @@ export class AmazonCreatorsApiAdapter {
           marketplace: 'US',
           partnerTag,
           itemIds: ['B09XS7JWHH'],
-          resources: ['ItemInfo.Title'],
+          resources: ['itemInfo.title'],
         });
         catalogSuccess = true;
         state = 'ELIGIBLE';
