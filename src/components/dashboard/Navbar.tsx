@@ -34,7 +34,7 @@ export default function Navbar({ title = 'Overview', subtitle, onOpenCreate }: N
 
     if (c === 'CA') {
       domain = 'www.amazon.ca';
-      tag = 'meridian-ca-20';
+      tag = 'kgold0c-20';
     } else if (c === 'GB' || c === 'UK') {
       domain = 'www.amazon.co.uk';
       tag = 'meridiantech-uk-21';

@@ -33,7 +33,7 @@ test.describe('MeridianLink End-to-End Test Suite', () => {
     expect(caRes.status()).toBe(302);
     const caLoc = caRes.headers()['location'];
     expect(caLoc).toContain('amazon.ca/dp/B09XS7JWHH');
-    expect(caLoc).toContain('tag=meridian-ca-20');
+    expect(caLoc).toContain('tag=kgold0c-20');
 
     // Test Simulated UK redirect with group override
     const ukRes = await request.get('/r/sony-xm5?__country=GB', { maxRedirects: 0 });

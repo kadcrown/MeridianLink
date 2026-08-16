@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger';
 
 export const SAMPLE_AMAZON_TAGS: Record<string, string> = {
   US: 'meridian-20',
-  CA: 'meridian-ca-20',
+  CA: 'kgold0c-20',
   GB: 'meridian-uk-21',
   DE: 'meridian-de-21',
   FR: 'meridian-fr-21',

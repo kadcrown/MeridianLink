@@ -155,7 +155,7 @@ async function main() {
   console.log('Seeding 21 Amazon default Associates tags...');
   const sampleTags: Record<string, string> = {
     US: 'meridian-20',
-    CA: 'meridian-ca-20',
+    CA: 'kgold0c-20',
     GB: 'meridian-uk-21',
     DE: 'meridian-de-21',
     FR: 'meridian-fr-21',
