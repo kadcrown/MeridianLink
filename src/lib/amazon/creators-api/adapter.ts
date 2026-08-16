@@ -23,15 +23,18 @@ export class AmazonCreatorsApiAdapter {
   }
 
   /**
-   * Resolves the Amazon marketplace domain (e.g., www.amazon.com).
+   * Resolves the Amazon marketplace domain required by Creators API (e.g., www.amazon.com).
    */
   private getMarketplaceDomain(marketplaceId: string): string {
     const upper = marketplaceId.toUpperCase();
     const mp = AMAZON_MARKETPLACES[upper];
-    if (!mp) {
-      throw new Error(`Unsupported marketplace identifier: ${marketplaceId}`);
+    if (mp) {
+      return mp.domain.startsWith('www.') ? mp.domain : `www.${mp.domain}`;
     }
-    return mp.domain;
+    if (marketplaceId.includes('amazon.')) {
+      return marketplaceId.startsWith('www.') ? marketplaceId : `www.${marketplaceId}`;
+    }
+    return 'www.amazon.com';
   }
 
   /**

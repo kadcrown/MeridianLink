@@ -106,8 +106,12 @@ export async function POST(request: NextRequest) {
 
     // Default Action: TEST
     clearTokenCache();
+    const defaultTag = await prisma.amazonAffiliateTag.findFirst({
+      where: { marketplace: 'US', isDefault: true },
+    });
+    const partnerTag = defaultTag?.tag || 'meridian-20';
     const adapter = new AmazonCreatorsApiAdapter();
-    const testResult = await adapter.testConnection('meridian-20');
+    const testResult = await adapter.testConnection(partnerTag);
 
     return NextResponse.json({ testResult });
   } catch (error) {
