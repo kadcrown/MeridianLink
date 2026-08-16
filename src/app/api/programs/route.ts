@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { getOwnerSession } from '@/lib/auth/session';
 import { encryptSecret } from '@/lib/retailers/crypto';
+import { ensureCatalogSeeded } from '@/lib/db/seed-service';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,9 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Ensure catalog is populated if fresh database
+    await ensureCatalogSeeded();
 
     const { searchParams } = request.nextUrl;
     const query = searchParams.get('q')?.toLowerCase() || '';

@@ -6,6 +6,8 @@ import { AMAZON_MARKETPLACES } from '@/lib/amazon/marketplaces';
 import { validateAffiliateTag } from '@/lib/amazon/tagger';
 import { logger } from '@/lib/logger';
 
+import { seedDefaultAmazonTags } from '@/lib/db/seed-service';
+
 export const dynamic = 'force-dynamic';
 
 const updateTagsSchema = z.object({
@@ -19,9 +21,16 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const defaultTags = await prisma.amazonAffiliateTag.findMany({
+    let defaultTags = await prisma.amazonAffiliateTag.findMany({
       where: { isDefault: true, groupId: null, smartLinkId: null },
     });
+
+    if (defaultTags.length === 0) {
+      await seedDefaultAmazonTags();
+      defaultTags = await prisma.amazonAffiliateTag.findMany({
+        where: { isDefault: true, groupId: null, smartLinkId: null },
+      });
+    }
 
     const tagMap = new Map(defaultTags.map((t) => [t.marketplace, t.tag]));
 
